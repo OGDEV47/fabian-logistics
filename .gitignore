@@ -36,3 +36,17 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+# supabase
+.supabase
+
+# next.js
+.next/
+out/
+
+# node_modules
+node_modules/
+
+# prisma
+prisma/.env
+prisma/dev.db
