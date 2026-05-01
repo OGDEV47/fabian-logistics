@@ -6,7 +6,6 @@ import { supabase } from "@/utils/supabase";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [isSignIn, setIsSignIn] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -18,24 +17,15 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      if (isSignIn) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
-        router.push("/dashboard");
-      } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-        });
-        if (error) throw error;
-        // On successful sign up, auto-login or redirect
-        router.push("/dashboard");
-      }
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
+
+      router.push("/dashboard");
     } catch (err: any) {
-      setError(err.message || "An error occurred during authentication.");
+      setError("Invalid credentials. Please check your email and password.");
     } finally {
       setLoading(false);
     }
@@ -50,13 +40,9 @@ export default function LoginPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">
-            {isSignIn ? "Welcome Back" : "Create an Account"}
-          </h1>
+          <h1 className="text-2xl font-bold text-slate-900">Welcome Back</h1>
           <p className="text-slate-500 mt-2 text-sm">
-            {isSignIn 
-              ? "Enter your credentials to access your account." 
-              : "Sign up to start tracking packages and submitting pre-alerts."}
+            Enter your credentials to access your account.
           </p>
         </div>
 
@@ -79,7 +65,13 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Password</label>
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-sm font-medium text-slate-700">Password</label>
+              {/* Story 1: Access Forgot Password */}
+              <a href="/forgot-password" className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors">
+                Forgot password?
+              </a>
+            </div>
             <input
               type="password"
               required
@@ -100,25 +92,17 @@ export default function LoginPage() {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-            ) : isSignIn ? (
-              "Sign In"
             ) : (
-              "Create Account"
+              "Sign In"
             )}
           </button>
         </form>
 
         <div className="mt-8 text-center text-sm text-slate-500">
-          {isSignIn ? "Don't have an account? " : "Already have an account? "}
-          <button
-            onClick={() => {
-              setIsSignIn(!isSignIn);
-              setError(null);
-            }}
-            className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
-          >
-            {isSignIn ? "Sign Up" : "Sign In"}
-          </button>
+          Don't have an account?{" "}
+          <a href="/signup" className="text-blue-600 hover:text-blue-700 font-medium transition-colors">
+            Sign Up
+          </a>
         </div>
       </div>
     </div>

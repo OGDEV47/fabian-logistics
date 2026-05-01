@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../utils/supabase";
+import Link from 'next/link';
 
 export default function DashboardLayout({
   children,
@@ -11,14 +12,28 @@ export default function DashboardLayout({
 }>) {
   const router = useRouter();
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
 
   useEffect(() => {
+    const fetchUserData = async (userId: string) => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('first_name, last_name')
+        .eq('id', userId)
+        .single();
+
+      if (data && data.first_name) {
+        setUserName(`${data.first_name} ${data.last_name || ''}`.trim());
+      }
+    };
+
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         router.push("/login");
       } else {
         setUserEmail(session.user.email ?? null);
+        fetchUserData(session.user.id);
       }
     };
 
@@ -29,6 +44,7 @@ export default function DashboardLayout({
         router.push("/login");
       } else {
         setUserEmail(session.user.email ?? null);
+        fetchUserData(session.user.id);
       }
     });
 
@@ -37,10 +53,17 @@ export default function DashboardLayout({
     };
   }, [router]);
 
-  // Notice: The manual loading check is completely gone. 
-  // The layout renders instantly, and the Pre-Alerts page is free to handle its own data fetching.
-
-  const initials = userEmail ? userEmail.substring(0, 2).toUpperCase() : "JD";
+  // Use name initials if available, otherwise email initials
+  const getInitials = () => {
+    if (userName) {
+      const parts = userName.split(' ');
+      if (parts.length > 1) {
+        return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+      }
+      return userName.substring(0, 2).toUpperCase();
+    }
+    return userEmail ? userEmail.substring(0, 2).toUpperCase() : "JD";
+  };
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -75,6 +98,11 @@ export default function DashboardLayout({
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
             Calculator
           </a>
+          {/* New Profile Link */}
+          <a href="/profile" className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-colors font-medium">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+            Profile
+          </a>
         </nav>
       </aside>
 
@@ -83,15 +111,15 @@ export default function DashboardLayout({
         {/* Top Header */}
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-end px-8 flex-shrink-0 z-10">
           <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3">
+            <Link href="/profile" className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer">
               <div className="text-right">
-                <div className="text-sm font-semibold text-slate-900">{userEmail}</div>
-                <div className="text-xs text-slate-500">Customer</div>
+                <div className="text-sm font-bold text-slate-900">{userName || 'Loading...'}</div>
+                <div className="text-xs text-slate-500">{userEmail} • Customer</div>
               </div>
               <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 border border-blue-200 flex items-center justify-center font-bold text-sm">
-                {initials}
+                {getInitials()}
               </div>
-            </div>
+            </Link>
             <div className="h-6 w-px bg-slate-200"></div>
             <button
               onClick={handleSignOut}
