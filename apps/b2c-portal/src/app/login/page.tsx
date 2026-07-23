@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/utils/supabase";
+import { createClient } from "@supabase/supabase-js";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,7 +19,22 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      // Implement the session persistence logic:
+      // If "Remember Me" is unchecked, we configure the auth client to use sessionStorage.
+      // Note: Overarching session expiration is governed by Supabase's default short-lived JWT settings for maximum logistics security.
+      const authClient = rememberMe
+        ? supabase
+        : createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+              auth: {
+                storage: window.sessionStorage,
+              },
+            }
+          );
+
+      const { error } = await authClient.auth.signInWithPassword({
         email,
         password,
       });
@@ -65,13 +82,7 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <div className="flex justify-between items-center mb-2">
-              <label className="block text-sm font-medium text-slate-700">Password</label>
-              {/* Story 1: Access Forgot Password */}
-              <a href="/forgot-password" className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors">
-                Forgot password?
-              </a>
-            </div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Password</label>
             <input
               type="password"
               required
@@ -80,6 +91,26 @@ export default function LoginPage() {
               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 placeholder:text-slate-400"
               placeholder="••••••••"
             />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <input
+                id="remember-me"
+                name="remember-me"
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-500">
+                Remember me
+              </label>
+            </div>
+            {/* Story 1: Access Forgot Password */}
+            <a href="/forgot-password" className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors">
+              Forgot password?
+            </a>
           </div>
 
           <button

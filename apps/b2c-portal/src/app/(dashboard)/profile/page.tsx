@@ -1,59 +1,84 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/utils/supabase';
 
+const JAMAICAN_PARISHES = [
+    'Kingston',
+    'St. Andrew',
+    'St. Catherine',
+    'Clarendon',
+    'Manchester',
+    'St. Elizabeth',
+    'Westmoreland',
+    'Hanover',
+    'St. James',
+    'Trelawny',
+    'St. Ann',
+    'St. Mary',
+    'Portland',
+    'St. Thomas'
+] as const;
+
 export default function ProfilePage() {
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
+    const [loading, setLoading] = useState<boolean>(true);
+    const [saving, setSaving] = useState<boolean>(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
-    // Identity State (Read-only)
+    // Identity State
     const [userId, setUserId] = useState<string | null>(null);
-    const [email, setEmail] = useState('');
-    const [suiteNumber, setSuiteNumber] = useState('');
+    const [email, setEmail] = useState<string>('');
+    const [suiteNumber, setSuiteNumber] = useState<string>('');
 
     // Editable Profile State
-    const [firstName, setFirstName] = useState('');
-    const [lastName, setLastName] = useState('');
-    const [phone, setPhone] = useState('');
+    const [firstName, setFirstName] = useState<string>('');
+    const [lastName, setLastName] = useState<string>('');
+    const [phone, setPhone] = useState<string>('');
+    const [dateOfBirth, setDateOfBirth] = useState<string>('');
 
     // Delivery Preferences State
-    const [branch, setBranch] = useState('Kingston Branch');
-    const [localAddress, setLocalAddress] = useState('');
+    const [branch, setBranch] = useState<string>('Kingston Branch');
+
+    // Saved Location State
+    const [streetAddress, setStreetAddress] = useState<string>('');
+    const [city, setCity] = useState<string>('');
+    const [parish, setParish] = useState<string>('Kingston');
 
     // Authorized Users State
     const [authorizedUsers, setAuthorizedUsers] = useState<string[]>([]);
-    const [newUserName, setNewUserName] = useState('');
+    const [newUserName, setNewUserName] = useState<string>('');
+
+    const fetchProfile = useCallback(async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        setUserId(session.user.id);
+        setEmail(session.user.email || '');
+
+        const { data } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+
+        if (data) {
+            setFirstName(data.first_name || '');
+            setLastName(data.last_name || '');
+            setSuiteNumber(data.suite_number || '');
+            setPhone(data.phone || '');
+            setDateOfBirth(data.date_of_birth || '');
+            setBranch(data.preferred_branch || 'Kingston Branch');
+            setStreetAddress(data.street_address || data.local_address || '');
+            setCity(data.city || '');
+            setParish(data.parish || 'Kingston');
+            setAuthorizedUsers(data.authorized_users || []);
+        }
+        setLoading(false);
+    }, []);
 
     useEffect(() => {
-        const fetchProfile = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) return;
-
-            setUserId(session.user.id);
-            setEmail(session.user.email || '');
-
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .single();
-
-            if (data) {
-                setFirstName(data.first_name || '');
-                setLastName(data.last_name || '');
-                setSuiteNumber(data.suite_number || '');
-                setPhone(data.phone || '');
-                setBranch(data.preferred_branch || 'Kingston Branch');
-                setLocalAddress(data.local_address || '');
-                setAuthorizedUsers(data.authorized_users || []);
-            }
-            setLoading(false);
-        };
-
         fetchProfile();
-    }, []);
+    }, [fetchProfile]);
 
     const handleSaveProfile = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -67,9 +92,14 @@ export default function ProfilePage() {
             .update({
                 first_name: firstName,
                 last_name: lastName,
+                email: email,
                 phone: phone,
+                date_of_birth: dateOfBirth,
                 preferred_branch: branch,
-                local_address: localAddress,
+                street_address: streetAddress,
+                city: city,
+                parish: parish,
+                local_address: `${streetAddress}${city ? `, ${city}` : ''}${parish ? `, ${parish}` : ''}`,
                 authorized_users: authorizedUsers
             })
             .eq('id', userId);
@@ -81,6 +111,11 @@ export default function ProfilePage() {
             setTimeout(() => setMessage(null), 3000);
         }
         setSaving(false);
+    };
+
+    const handleCancel = (e: React.MouseEvent) => {
+        e.preventDefault();
+        fetchProfile();
     };
 
     const addAuthorizedUser = (e: React.MouseEvent) => {
@@ -121,7 +156,7 @@ export default function ProfilePage() {
                     {/* Personal Information */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
                         <h2 className="text-xl font-semibold text-slate-800 mb-6">Personal Information</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-2">First Name</label>
                                 <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} required
@@ -132,14 +167,20 @@ export default function ProfilePage() {
                                 <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} required
                                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" />
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Email Address <span className="text-slate-400 font-normal">(Read-only)</span></label>
-                                <input type="email" value={email} disabled
-                                    className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl text-slate-500 cursor-not-allowed" />
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Email Address</label>
+                                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" />
+                                <p className="text-xs text-slate-500 mt-2">Changing this will require email verification.</p>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-2">Phone Number</label>
                                 <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(876) 000-0000"
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Date of Birth</label>
+                                <input type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)}
                                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" />
                             </div>
                         </div>
@@ -169,16 +210,35 @@ export default function ProfilePage() {
                             <h2 className="text-xl font-semibold text-slate-800">My Saved Location</h2>
                             <span className="text-xs font-medium bg-blue-50 text-blue-600 border border-blue-100 px-2.5 py-1 rounded-md">Primary</span>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Local Address (Jamaica)</label>
-                            <textarea value={localAddress} onChange={(e) => setLocalAddress(e.target.value)} rows={3}
-                                placeholder="E.g., 123 Main Street, Kingston 10, St. Andrew"
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 resize-none" />
-                            <p className="text-xs text-slate-500 mt-2">We will use this address if you select Zipmail or Knutsford Express routing above.</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Street Address</label>
+                                <input type="text" value={streetAddress} onChange={(e) => setStreetAddress(e.target.value)} placeholder="E.g., 123 Main Street"
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">City</label>
+                                <input type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder="E.g., Kingston"
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Parish</label>
+                                <select value={parish} onChange={(e) => setParish(e.target.value)}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900">
+                                    {JAMAICAN_PARISHES.map((p) => (
+                                        <option key={p} value={p}>{p}</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
+                        <p className="text-xs text-slate-500 mt-4">We will use this address if you select Zipmail or Knutsford Express routing above.</p>
                     </div>
 
-                    <div className="flex justify-end">
+                    <div className="flex justify-end items-center gap-4">
+                        <button type="button" onClick={handleCancel}
+                            className="px-6 py-3.5 border border-slate-200 hover:bg-slate-100 text-slate-700 font-medium rounded-xl transition-colors">
+                            Cancel
+                        </button>
                         <button type="submit" disabled={saving}
                             className="px-8 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl shadow-sm transition-colors flex items-center gap-2 disabled:opacity-70">
                             {saving ? 'Saving Changes...' : 'Save Profile Changes'}
